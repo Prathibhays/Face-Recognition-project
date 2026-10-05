@@ -1,26 +1,12 @@
 import numpy as np
 
 
-def projectData(Xcentered, principalComponents):
-    # Project centered data into PCA space
-
-    Xcentered = np.asarray(Xcentered)
-    principalComponents = np.asarray(principalComponents)
-
-    if Xcentered.shape[1] != principalComponents.shape[0]:
-        raise ValueError(
-            "Number of pixels in the data must match "
-            "the number of rows in the principal components."
-        )
-
-    return Xcentered @ principalComponents
+def project_face(face_vector, pca):
+    vector = np.asarray(face_vector, dtype=np.float64)
+    if vector.ndim == 1:
+        vector = vector.reshape(1, -1)
+    return pca.transform(vector)
 
 
-def projectSingleImage(image, meanFace, principalComponents):
-    # Project one new face image into PCA space
-
-    image = np.asarray(image).reshape(1, -1)
-
-    centeredImage = image - meanFace
-
-    return centeredImage @ principalComponents
+def reconstruct_face(projected_vector, pca):
+    return pca.inverse_transform(projected_vector)

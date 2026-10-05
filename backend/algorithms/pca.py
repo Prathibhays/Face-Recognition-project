@@ -1,138 +1,61 @@
 import numpy as np
 
 
-def flattenImages(images):
-    # Convert images into rows of pixel values
+class PCAEngine:
+    # Educational PCA implementation using eigen-decomposition.
 
-    images = np.asarray(images)
+    def __init__(self, n_components=50):
+        self.n_components = n_components
+        self.mean_ = None
+        self.components_ = None
+        self.eigenvalues_ = None
+        self.explained_variance_ratio_ = None
+        self.cumulative_variance_ = None
 
-    return images.reshape(images.shape[0], -1)
+    def fit(self, X):
+        X = np.asarray(X, dtype=np.float64)
+        if X.ndim != 2:
+            raise ValueError("X must be a 2D matrix.")
 
+        n_samples, n_features = X.shape
+        self.mean_ = np.mean(X, axis=0)
+        X_centered = X - self.mean_
 
-def computeMeanFace(X):
-    # Calculate the mean value of each pixel
+        covariance = np.cov(X_centered, rowvar=False)
+        eigenvalues, eigenvectors = np.linalg.eigh(covariance)
 
-    return np.mean(X, axis=0)
+        order = np.argsort(eigenvalues)[::-1]
+        eigenvalues = np.real(eigenvalues[order])
+        eigenvectors = np.real(eigenvectors[:, order])
+        eigenvalues = np.maximum(eigenvalues, 0)
 
+        total = np.sum(eigenvalues)
+        ratios = eigenvalues / total if total else np.zeros_like(eigenvalues)
 
-def centerData(X, meanFace):
-    # Subtract the mean face from each image
+        k = min(int(self.n_components), len(eigenvalues), n_samples, n_features)
 
-    return X - meanFace
+        self.eigenvalues_ = eigenvalues[:k]
+        self.components_ = eigenvectors[:, :k].T
+        self.explained_variance_ratio_ = ratios[:k]
+        self.cumulative_variance_ = np.cumsum(self.explained_variance_ratio_)
+        return self
 
+    def transform(self, X):
+        if self.mean_ is None or self.components_ is None:
+            raise RuntimeError("PCAEngine has not been fitted.")
 
-def computeCovariance(Xcentered):
-    # Compute the compact covariance matrix
+        X = np.asarray(X, dtype=np.float64)
+        if X.ndim == 1:
+            X = X.reshape(1, -1)
 
-    numberOfImages = Xcentered.shape[0]
+        return (X - self.mean_) @ self.components_.T
 
-    if numberOfImages < 2:
-        raise ValueError("At least two images are required.")
+    def fit_transform(self, X):
+        self.fit(X)
+        return self.transform(X)
 
-    return (Xcentered @ Xcentered.T) / (numberOfImages - 1)
-
-
-def computeEigen(covarianceMatrix):
-    # Calculate eigenvalues and eigenvectors
-
-    eigenvalues, eigenvectors = np.linalg.eigh(covarianceMatrix)
-
-    # Sort from largest eigenvalue to smallest
-    order = np.argsort(eigenvalues)[::-1]
-
-    eigenvalues = eigenvalues[order]
-    eigenvectors = eigenvectors[:, order]
-
-    return eigenvalues, eigenvectors
-
-
-def computePrincipalComponents(
-    Xcentered,
-    eigenvalues,
-    eigenvectors,
-    numberOfComponents
-):
-    # Convert compact eigenvectors into principal components
-
-    numberOfImages = Xcentered.shape[0]
-
-    numberOfComponents = min(
-        numberOfComponents,
-        numberOfImages
-    )
-
-    selectedEigenvalues = eigenvalues[:numberOfComponents]
-    selectedEigenvectors = eigenvectors[:, :numberOfComponents]
-
-    components = []
-
-    for i in range(numberOfComponents):
-
-        if selectedEigenvalues[i] > 1e-12:
-
-            component = (
-                Xcentered.T @ selectedEigenvectors[:, i]
-            ) / np.sqrt(
-                selectedEigenvalues[i]
-                * (numberOfImages - 1)
-            )
-
-            components.append(component)
-
-    if len(components) == 0:
-        raise ValueError("No valid principal components found.")
-
-    return np.column_stack(components)
-
-
-def computeExplainedVariance(eigenvalues):
-    # Calculate the fraction of total variance explained
-
-    totalVariance = np.sum(eigenvalues)
-
-    if totalVariance <= 0:
-        raise ValueError("Total variance must be positive.")
-
-    return eigenvalues / totalVariance
-
-
-def fitPCA(X, numberOfComponents):
-    # Run the complete PCA pipeline
-
-    X = flattenImages(X)
-
-    meanFace = computeMeanFace(X)
-
-    Xcentered = centerData(
-        X,
-        meanFace
-    )
-
-    covarianceMatrix = computeCovariance(
-        Xcentered
-    )
-
-    eigenvalues, eigenvectors = computeEigen(
-        covarianceMatrix
-    )
-
-    principalComponents = computePrincipalComponents(
-        Xcentered,
-        eigenvalues,
-        eigenvectors,
-        numberOfComponents
-    )
-
-    explainedVariance = computeExplainedVariance(
-        eigenvalues
-    )
-
-    return {
-        "meanFace": meanFace,
-        "centeredData": Xcentered,
-        "covarianceMatrix": covarianceMatrix,
-        "eigenvalues": eigenvalues,
-        "eigenvectors": eigenvectors,
-        "principalComponents": principalComponents,
-        "explainedVariance": explainedVariance
-    }
+    def inverse_transform(self, Z):
+        Z = np.asarray(Z, dtype=np.float64)
+        if Z.ndim == 1:
+            Z = Z.reshape(1, -1)
+        return Z @ self.components_ + self.mean_
