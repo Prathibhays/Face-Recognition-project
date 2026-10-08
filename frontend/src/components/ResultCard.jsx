@@ -39,10 +39,7 @@ export default function ResultCard({ result }) {
           <span>PCA components</span>
           <strong>{result.components}</strong>
         </div>
-        <div className="metric">
-          <span>Face detected</span>
-          <strong>{result.face_detected ? "Yes" : "No"}</strong>
-        </div>
+        
       </div>
 
       <h3 className="neighbors-title">Nearest neighbors</h3>
